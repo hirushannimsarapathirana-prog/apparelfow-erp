@@ -12,7 +12,7 @@ export const createOrderSchema = z.object({
 });
 
 export const orderIdSchema = z.object({
-  body: z.object({}),
+  body: z.object({}).optional(),
   params: z.object({
     id: z.string().uuid(),
   }),
