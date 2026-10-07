@@ -1,8 +1,6 @@
-export enum VerificationStatus {
-  GREEN = "GREEN",
-  YELLOW = "YELLOW",
-  RED = "RED",
-}
+import { VerificationStatus } from "@prisma/client";
+
+export { VerificationStatus };
 
 export function getVerificationStatus(
   expectedQty: number,
@@ -22,11 +20,14 @@ export function getVerificationStatus(
 export function canApproveVerification(
   statuses: VerificationStatus[],
 ): boolean {
-  return statuses.length > 0 &&
-    statuses.every((status) =>
-      status === VerificationStatus.GREEN ||
-      status === VerificationStatus.YELLOW
-    );
+  return (
+    statuses.length > 0 &&
+    statuses.every(
+      (status) =>
+        status === VerificationStatus.GREEN ||
+        status === VerificationStatus.YELLOW,
+    )
+  );
 }
 
 export function validateApproval(
@@ -42,9 +43,10 @@ export function validateApproval(
 export function validateRejectionReason(
   rejectionReason: string | null | undefined,
 ): void {
-  if (!rejectionReason || rejectionReason.trim().length === 0) {
-    throw new Error(
-      "Rejection reason is required.",
-    );
+  if (
+    !rejectionReason ||
+    rejectionReason.trim().length === 0
+  ) {
+    throw new Error("Rejection reason is required.");
   }
 }

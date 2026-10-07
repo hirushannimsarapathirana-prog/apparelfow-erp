@@ -14,9 +14,12 @@ enum UserRole {
 }
 
 enum CuttingOrderStatus {
-  PENDING
+  CUTTING_IN_PROGRESS
+  PENDING_VERIFICATION
+  COUNT_QC
   VERIFIED
   REJECTED
+  SEWING_QUEUE
 }
 
 enum VerificationStatus {
@@ -81,7 +84,7 @@ model CuttingOrder {
   targetQty      Int                @map("target_qty")
   fabricRollId   String?            @map("fabric_roll_id")
   actualFabricYds Decimal?          @map("actual_fabric_yds") @db.Decimal(12, 3)
-  status         CuttingOrderStatus @default(PENDING)
+  status         CuttingOrderStatus @default(CUTTING_IN_PROGRESS)
   createdBy      String             @map("created_by") @db.Uuid
   createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
