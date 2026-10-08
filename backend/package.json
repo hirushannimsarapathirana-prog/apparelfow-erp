@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/database/seed/index.ts",
     "test": "jest"
