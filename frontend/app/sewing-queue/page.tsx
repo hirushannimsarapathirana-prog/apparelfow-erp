@@ -46,7 +46,7 @@ export default function SewingQueuePage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/sewing`,
+        `${API_URL}/sewing/queue`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

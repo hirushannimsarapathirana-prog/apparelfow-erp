@@ -63,5 +63,17 @@ export async function updateOrderStatus(
   return prisma.cuttingOrder.update({
     where: { id },
     data: { status },
+    include: {
+      recipe: {
+        include: {
+          components: true,
+        },
+      },
+      verificationItems: {
+        include: {
+          component: true,
+        },
+      },
+    },
   });
 }
