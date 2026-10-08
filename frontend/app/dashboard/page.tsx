@@ -42,6 +42,10 @@ export default function DashboardPage() {
     window.location.href = "/";
   }
 
+  function openPage(href: string) {
+    window.location.href = href;
+  }
+
   if (!user) {
     return (
       <main className="dashboard-loading">
@@ -55,14 +59,12 @@ export default function DashboardPage() {
   return (
     <main className="dashboard-page">
       <header className="dashboard-header">
-        <div>
-          <div className="dashboard-brand">
-            <div className="brand-mark small">AF</div>
+        <div className="dashboard-brand">
+          <div className="brand-mark small">AF</div>
 
-            <div>
-              <h1>ApparelFlow ERP</h1>
-              <p>Production Control System</p>
-            </div>
+          <div>
+            <h1>ApparelFlow ERP</h1>
+            <p>Production Control System</p>
           </div>
         </div>
 
@@ -80,9 +82,7 @@ export default function DashboardPage() {
           <div>
             <p className="eyebrow">Production workspace</p>
 
-            <h2>
-              Welcome, {user.fullName}
-            </h2>
+            <h2>Welcome, {user.fullName}</h2>
 
             <p>
               Manage your assigned production workflow from this dashboard.
@@ -100,11 +100,15 @@ export default function DashboardPage() {
               <DashboardCard
                 title="Cutting Orders"
                 description="Create, manage and submit cutting batches for verification."
+                href="/cutting-orders"
+                onOpen={openPage}
               />
 
               <DashboardCard
                 title="Recipes"
                 description="Manage garment recipes and component requirements."
+                href="/recipes"
+                onOpen={openPage}
               />
 
               <DashboardCard
@@ -119,6 +123,8 @@ export default function DashboardPage() {
               <DashboardCard
                 title="Pending Verification"
                 description="Review cutting batches and verify component quantities."
+                href="/verification"
+                onOpen={openPage}
               />
 
               <DashboardCard
@@ -138,6 +144,8 @@ export default function DashboardPage() {
               <DashboardCard
                 title="Sewing Queue"
                 description="View cutting batches that have passed verification."
+                href="/sewing-queue"
+                onOpen={openPage}
               />
 
               <DashboardCard
@@ -169,12 +177,22 @@ export default function DashboardPage() {
 interface DashboardCardProps {
   title: string;
   description: string;
+  href?: string;
+  onOpen?: (href: string) => void;
 }
 
 function DashboardCard({
   title,
   description,
+  href,
+  onOpen,
 }: DashboardCardProps) {
+  function handleClick() {
+    if (href && onOpen) {
+      onOpen(href);
+    }
+  }
+
   return (
     <article className="dashboard-card">
       <div className="card-icon">✓</div>
@@ -183,8 +201,13 @@ function DashboardCard({
 
       <p>{description}</p>
 
-      <button type="button" disabled>
-        Coming next
+      <button
+        type="button"
+        className={href ? "card-button active" : "card-button"}
+        onClick={handleClick}
+        disabled={!href}
+      >
+        {href ? "Open" : "Coming next"}
       </button>
     </article>
   );
