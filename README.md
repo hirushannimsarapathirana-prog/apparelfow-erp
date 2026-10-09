@@ -1,49 +1,59 @@
 # ApparelFlow ERP
 
-Production Batch Verification & Sewing Queue Gate
+**Production Batch Verification & Sewing Queue Gate**
 
-A full-stack ERP workflow for apparel production that enforces a server-side verification gate between cutting and sewing.
+ApparelFlow ERP is a full-stack apparel production workflow application designed to manage cutting orders, component verification, fabric wastage calculations, and sewing queue eligibility.
 
-## Project Overview
+The system enforces a server-side verification gate to prevent unverified, incomplete, or mismatched cutting batches from entering the sewing workflow.
 
-ApparelFlow ERP manages the production flow from cutting to sewing while ensuring that no cutting batch can enter the sewing queue before all required components have been explicitly verified.
+## Live Demo
 
-The system uses role-based access control (RBAC) with three production roles:
+* **Frontend:** https://apparelfow-erp-nine.vercel.app/
+* **Backend API:** https://apparelfow-erp-api.vercel.app/
+* **Repository:** https://github.com/hirushannimsarapathirana-prog/apparelfow-erp
 
-* `cutting_supervisor`
-* `cutting_verifier`
-* `sewing_supervisor`
+> Deployment URLs are provided for demonstration. Availability depends on the current deployment configuration.
 
-The most important business rule is enforced on the backend:
+## Key Features
 
-> A cutting batch cannot be approved for sewing unless every required component has been verified and has a GREEN or YELLOW result.
+* JWT-based authentication
+* Role-based access control (RBAC)
+* Recipe and recipe-component management
+* Cutting order creation and submission
+* Component quantity verification
+* GREEN, YELLOW, and RED verification results
+* Server-side approval and rejection rules
+* Mandatory rejection reasons
+* Fabric consumption and wastage calculations
+* Immutable verification audit records
+* Database-enforced sewing queue eligibility
+* Request validation and defensive error handling
+* Unit and integration testing
 
-RED, missing, or uncounted components block approval.
+## Business Rule
 
----
+A cutting batch cannot be approved for sewing unless every required recipe component has been counted and verified.
 
-## Architecture
+| Verification condition                     | Result           | Approval |
+| ------------------------------------------ | ---------------- | -------- |
+| Actual quantity equals expected quantity   | GREEN            | Allowed  |
+| Actual quantity exceeds expected quantity  | YELLOW           | Allowed  |
+| Actual quantity is below expected quantity | RED              | Blocked  |
+| Component is missing or uncounted          | RED / incomplete | Blocked  |
 
-```text
-                    ┌─────────────────────┐
-                    │      Next.js UI      │
-                    │      Frontend        │
-                    └──────────┬──────────┘
-                               │ REST API
-                               ▼
-                    ┌─────────────────────┐
-                    │   Express + TS API  │
-                    │      Backend        │
-                    └──────────┬──────────┘
-                               │ Prisma
-                               ▼
-                    ┌─────────────────────┐
-                    │ Supabase PostgreSQL │
-                    │      Database       │
-                    └─────────────────────┘
-```
+The backend is responsible for enforcing these rules. Frontend visibility alone is not considered an authorization or verification control.
 
-### Backend stack
+An approval attempt with invalid verification data is rejected with HTTP `422`. Unauthorized requests are rejected with HTTP `403`.
+
+## Technology Stack
+
+### Frontend
+
+* Next.js
+* React
+* TypeScript
+
+### Backend
 
 * Node.js
 * Express
@@ -52,26 +62,48 @@ RED, missing, or uncounted components block approval.
 * PostgreSQL / Supabase
 * JWT authentication
 * bcrypt password hashing
-* Zod validation
+* Zod request validation
+
+### Testing
+
 * Jest
 * Supertest
 
-### Frontend stack
+### Deployment
 
-* Next.js
-* React
-* TypeScript
+* Vercel for the deployed application components, according to the configured deployment setup
+* Supabase PostgreSQL for persistent database storage, if configured as described below
 
----
+## Architecture
+
+```text
+┌─────────────────────────┐
+│       Next.js UI        │
+│        Frontend         │
+└────────────┬────────────┘
+             │ REST API
+             ▼
+┌─────────────────────────┐
+│    Express + TypeScript │
+│         Backend         │
+│                         │
+│ Auth / RBAC / Validation│
+│ Verification / Audit    │
+└────────────┬────────────┘
+             │ Prisma ORM
+             ▼
+┌─────────────────────────┐
+│   PostgreSQL Database   │
+│   Supabase (if used)    │
+└─────────────────────────┘
+```
 
 ## Repository Structure
 
 ```text
 apparelfow-erp/
-│
 ├── frontend/
 │   └── Next.js application
-│
 ├── backend/
 │   ├── src/
 │   │   ├── config/
@@ -82,204 +114,128 @@ apparelfow-erp/
 │   │   ├── routes/
 │   │   ├── app.ts
 │   │   └── server.ts
-│   │
 │   ├── tests/
 │   │   ├── unit/
 │   │   └── integration/
-│   │
 │   ├── prisma/
 │   ├── .env.example
 │   ├── package.json
 │   └── tsconfig.json
-│
-└── docs/
-    ├── API.md
-    └── AI-OPTIMIZATION-REPORT.md
+├── docs/
+│   └── API.md
+├── AI_OPTIMIZATION_REPORT.md
+└── README.md
 ```
 
----
+> Keep this tree aligned with the actual files in the repository. If the AI report currently lives in `docs/AI-OPTIMIZATION-REPORT.md`, either retain that path here or move it to the assessment-required root-level filename.
 
 ## Production Workflow
 
-The production state flow is:
-
 ```text
 CUTTING_IN_PROGRESS
-        │
-        ▼
+        |
+        v
 PENDING_VERIFICATION
-        │
-        ▼
-COUNT_QC
-     ┌──┴──┐
-     │     │
-     ▼     ▼
- VERIFIED REJECTED
-     │
-     ▼
-SEWING_QUEUE
+        |
+        v
+     COUNT_QC
+      /    \
+     v      v
+ VERIFIED  REJECTED
+     |
+     v
+ SEWING_QUEUE
 ```
 
-### Verification rules
+The backend must validate the current order state before allowing a transition. The sewing queue must return only orders whose persisted status is `VERIFIED`.
 
-For each recipe component:
-
-| Actual Quantity     | Result |
-| ------------------- | ------ |
-| Actual = Expected   | GREEN  |
-| Actual > Expected   | YELLOW |
-| Actual < Expected   | RED    |
-| Missing / Uncounted | RED    |
-
-Only GREEN and YELLOW components can be approved.
-
-If even one component is RED, the server rejects approval with HTTP `422`.
-
----
-
-## Roles & Permissions
+## Roles and Permissions
 
 ### Cutting Supervisor
 
-Can:
-
-* Login
-* View recipes
-* Create recipes
-* Edit recipes
+* Log in
+* View, create, and edit recipes
 * Create cutting orders
 * Submit cutting orders for verification
 
-Cannot:
-
-* Verify batches
-* Approve verification
-* Access sewing queue
+Cannot verify batches, approve verification, or access the sewing queue.
 
 ### Cutting Verifier
 
-Can:
-
-* Login
+* Log in
 * View pending verification batches
 * Enter actual component quantities
-* Approve valid batches
+* Approve batches that pass verification
 * Reject batches with a reason
 
-Cannot:
-
-* Create or edit recipes
-* Create cutting orders
-* Access sewing queue
+Cannot create or edit recipes, create cutting orders, or access the sewing queue.
 
 ### Sewing Supervisor
 
-Can:
-
-* Login
-* View the sewing queue
+* Log in
 * View verified batches
+* View the sewing queue
 
-Cannot:
+Cannot approve verification, modify verification results, or access unverified batches.
 
-* Approve verification
-* Modify verification results
-* Access unverified batches
-
----
+> The backend must enforce role permissions for every protected endpoint, independently of frontend navigation or visibility.
 
 ## Server-Side Verification Gate
 
-The critical business rule is enforced on the backend rather than relying on frontend visibility.
+Before approval, the backend must confirm that:
 
-Approval requires:
-
-1. Order is in `COUNT_QC`.
-2. Every required component exists.
+1. The cutting order is in `COUNT_QC`.
+2. Every required recipe component is present.
 3. Every component has an actual quantity.
-4. Every component is `GREEN` or `YELLOW`.
-5. Actual fabric usage is available.
-6. Wastage percentage is calculated and stored.
-7. An immutable approval audit log is created.
-8. Order status becomes `VERIFIED`.
+4. No component has a RED result.
+5. Actual fabric usage is supplied and valid.
+6. Wastage is calculated using the configured formula.
+7. An audit record is created for the verification action.
+8. The order status is updated to `VERIFIED`.
 
-The sewing queue explicitly queries only:
+Approval and its related audit records should be handled transactionally so a failed operation does not leave partially updated verification data.
+
+The sewing queue must query persisted records using:
 
 ```text
 status = VERIFIED
 ```
 
-Therefore an unverified batch cannot enter the sewing workflow by bypassing the frontend.
+This prevents an unverified batch from entering the sewing workflow by bypassing the frontend.
 
----
-
-## Recipes
+## Recipe Definitions
 
 ### Casual Blouse
 
-Recipe code:
+* **Recipe code:** `REC-BL01`
+* **Standard fabric:** 1.8 yards per garment
+* **Wastage cap:** 5%
 
-```text
-REC-BL01
-```
-
-Standard fabric:
-
-```text
-1.8 yards / garment
-```
-
-Wastage cap:
-
-```text
-5%
-```
-
-Components:
-
-```text
-Front Body Panel       1
-Back Body Panel        1
-Sleeves Left/Right     2
-Collar & Stand         1
-Sleeve Cuffs           2
-```
+| Component          | Expected quantity per garment |
+| ------------------ | ----------------------------: |
+| Front Body Panel   |                             1 |
+| Back Body Panel    |                             1 |
+| Sleeves Left/Right |                             2 |
+| Collar & Stand     |                             1 |
+| Sleeve Cuffs       |                             2 |
 
 ### Crop Top
 
-Recipe code:
+* **Recipe code:** `REC-CT02`
+* **Standard fabric:** 1.1 yards per garment
+* **Wastage cap:** 8%
 
-```text
-REC-CT02
-```
+| Component          | Expected quantity per garment |
+| ------------------ | ----------------------------: |
+| Front Chest Panel  |                             1 |
+| Back Support Panel |                             1 |
+| Neck Binding Strip |                             1 |
+| Hem Elastic Casing |                             1 |
+| Side Strap Accents |                             2 |
 
-Standard fabric:
+## Fabric and Wastage Calculation
 
-```text
-1.1 yards / garment
-```
-
-Wastage cap:
-
-```text
-8%
-```
-
-Components:
-
-```text
-Front Chest Panel      1
-Back Support Panel     1
-Neck Binding Strip     1
-Hem Elastic Casing     1
-Side Strap Accents     2
-```
-
----
-
-## Fabric Calculation
-
-Expected fabric is calculated as:
+Expected fabric usage:
 
 ```text
 Expected Fabric = Standard Fabric per Garment × Target Quantity
@@ -296,34 +252,31 @@ Example:
 
 ```text
 Standard fabric = 1.8 yards
-Target quantity = 100
+Target quantity = 100 garments
 
-Expected = 1.8 × 100
-         = 180 yards
+Expected fabric = 1.8 × 100
+                = 180 yards
 
-Actual = 189 yards
+Actual fabric   = 189 yards
 
-Wastage =
-((189 - 180) / 180) × 100
-= 5%
+Wastage %       = ((189 - 180) / 180) × 100
+                = 5%
 ```
 
----
+Numeric inputs should be validated on the server to reject invalid values, including non-numeric quantities, negative quantities, and invalid fabric measurements.
 
-## Database
+## Database Model
 
-Main entities:
+The main entities are:
 
-```text
-users
-recipes
-recipe_components
-cutting_orders
-verification_items
-verification_logs
-```
+* `users`
+* `recipes`
+* `recipe_components`
+* `cutting_orders`
+* `verification_items`
+* `verification_logs`
 
-Relationships:
+Conceptual relationships:
 
 ```text
 User
@@ -342,23 +295,19 @@ Recipe Component
  └── Verification Items
 ```
 
-Verification logs are append-only audit records.
+Verification logs serve as audit records and should be append-only through the application's normal workflows. Audit records should capture the verifier identity from the authenticated session, the verification timestamp, component count variances, and wastage information where applicable.
 
----
+## Authentication and Security
 
-## Authentication
+The application uses JWT bearer authentication.
 
-Authentication uses JWT bearer tokens.
-
-Request format:
+Example request header:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-Passwords are stored as bcrypt hashes.
-
-JWT payload contains:
+The JWT payload contains the authenticated user's identity and role, for example:
 
 ```json
 {
@@ -367,91 +316,77 @@ JWT payload contains:
 }
 ```
 
-JWT expiration:
+Token expiration and signing configuration must match the backend implementation. The current intended token lifetime is eight hours.
 
-```text
-8 hours
+Security measures include:
+
+* JWT authentication
+* Server-side role authorization
+* bcrypt password hashing
+* Zod request validation
+* Server-side verification rules
+* Explicit order-status checks
+* Transactional approval operations
+* Verification audit records
+* Defensive numeric validation
+* No reliance on frontend-only approval checks
+
+The authenticated user identity and audit timestamp must be derived by the backend, not trusted from client-supplied request fields.
+
+## Local Development Setup
+
+### Prerequisites
+
+Install the versions of Node.js and npm supported by the project. A configured PostgreSQL database is also required.
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/hirushannimsarapathirana-prog/apparelfow-erp.git
+cd apparelfow-erp
 ```
 
----
-
-## Demo Accounts
-
-For local assessment/demo use:
-
-| Role               | Email                       | Password       |
-| ------------------ | --------------------------- | -------------- |
-| Cutting Supervisor | `supervisor@apparelfow.com` | `Password123!` |
-| Cutting Verifier   | `verifier@apparelfow.com`   | `Password123!` |
-| Sewing Supervisor  | `sewing@apparelfow.com`     | `Password123!` |
-
-These are demonstration credentials only.
-
-For production deployment, replace them with secure credentials and secrets.
-
----
-
-## Backend Setup
-
-Navigate to the backend:
+### 2. Configure the backend
 
 ```powershell
 cd backend
-```
-
-Install dependencies:
-
-```powershell
 npm install
 ```
 
-Create the environment file:
-
-```text
-.env
-```
-
-Required environment variables:
+Create a `.env` file using `.env.example` as a reference. Configure the environment variables required by the actual backend implementation. Typical variables include:
 
 ```env
-DATABASE_URL=your_supabase_database_url
-JWT_SECRET=your_secure_jwt_secret
+DATABASE_URL=your_database_connection_string
+JWT_SECRET=your_secure_random_secret
 PORT=5000
 ```
 
-Generate Prisma Client:
+If Prisma uses a separate direct database connection for migrations, configure `DIRECT_URL` as required by the project's Prisma schema and database provider.
+
+Do not commit `.env` or production secrets to Git.
+
+### 3. Prepare the database
 
 ```powershell
 npx prisma generate
-```
-
-Push the schema:
-
-```powershell
 npx prisma db push
 ```
 
-Seed the database:
+Run the seed command only if a seed script is configured in `backend/package.json`:
 
 ```powershell
 npm run seed
 ```
 
----
+For a production database, use the project's intended migration workflow rather than applying schema changes without review.
 
-## Run Backend
-
-Development:
+### 4. Start the backend
 
 ```powershell
 npm run dev
 ```
 
-The API runs on:
-
-```text
-http://localhost:5000
-```
+The local API is expected to run at `http://localhost:5000` when configured with `PORT=5000`.
 
 Health check:
 
@@ -468,62 +403,83 @@ Expected response:
 }
 ```
 
----
+### 5. Configure the frontend
 
-## Testing
+Open another PowerShell terminal:
 
-Run all tests:
+```powershell
+cd frontend
+npm install
+```
+
+Create `frontend/.env.local` and set the API base URL to the local backend:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+```
+
+This value assumes the frontend appends API routes to `NEXT_PUBLIC_API_URL`. Match the variable and URL format to the actual frontend API client.
+
+Start the frontend:
+
+```powershell
+npm run dev
+```
+
+Open the local URL shown by Next.js, usually `http://localhost:3000`.
+
+## Testing and Build
+
+Run the commands from the `backend` directory.
+
+### Run automated tests
 
 ```powershell
 npm test -- --runInBand
 ```
 
-Current backend test result:
-
-```text
-Test Suites: 7 passed, 7 total
-Tests:       27 passed, 27 total
-```
-
-The test suite covers:
-
-* Verification status rules
-* Approval protection
-* RED component rejection
-* Missing component protection
-* Mandatory rejection reason
-* RBAC authorization
-* Sewing queue protection
-* State transitions
-* Wastage calculations
-
----
-
-## Build
-
-TypeScript validation:
+### TypeScript validation
 
 ```powershell
 npx tsc --noEmit
 ```
 
-Production build:
+### Production build
 
 ```powershell
 npm run build
 ```
 
----
+The test suite should verify:
+
+* GREEN and YELLOW approval
+* RED component rejection
+* Missing or uncounted component protection
+* Mandatory rejection reason
+* Unauthorized role rejection
+* Sewing queue filtering
+* Valid state transitions
+* Wastage calculations
+* Audit logging
+
+> Update the test totals below only after running the tests successfully in the current repository.
+
+```text
+Test Suites: [verify actual result]
+Tests:       [verify actual result]
+```
 
 ## API Overview
 
-Authentication:
+The following endpoints describe the intended API surface. Confirm the paths against the actual Express routes.
+
+### Authentication
 
 ```text
 POST /api/auth/login
 ```
 
-Recipes:
+### Recipes
 
 ```text
 GET    /api/recipes
@@ -532,7 +488,7 @@ POST   /api/recipes
 PUT    /api/recipes/:id
 ```
 
-Cutting orders:
+### Cutting Orders
 
 ```text
 GET    /api/cutting-orders
@@ -541,7 +497,7 @@ POST   /api/cutting-orders
 POST   /api/cutting-orders/:id/submit
 ```
 
-Verification:
+### Verification
 
 ```text
 GET    /api/verification/:orderId
@@ -550,152 +506,78 @@ POST   /api/verification/:orderId/approve
 POST   /api/verification/:orderId/reject
 ```
 
-Sewing:
+### Sewing Queue
 
 ```text
-GET    /api/sewing/queue
-GET    /api/sewing/queue/:orderId
+GET /api/sewing/queue
+GET /api/sewing/queue/:orderId
 ```
 
-Full API details are documented in:
+See `docs/API.md` for detailed request formats, response structures, validation errors, and authorization requirements.
 
-```text
-docs/API.md
-```
+## Demo Accounts
 
----
+Use only accounts that have actually been created by the project's seed script or demo database.
 
-## Security Design
+If the following accounts are configured in your local demo database, they can be documented as follows:
 
-The application uses multiple defensive layers:
+| Role               | Email                       | Password       |
+| ------------------ | --------------------------- | -------------- |
+| Cutting Supervisor | `supervisor@apparelfow.com` | `Password123!` |
+| Cutting Verifier   | `verifier@apparelfow.com`   | `Password123!` |
+| Sewing Supervisor  | `sewing@apparelfow.com`     | `Password123!` |
 
-* JWT authentication
-* Server-side RBAC
-* Zod request validation
-* Password hashing
-* Server-side verification rules
-* Explicit database status checks
-* Immutable verification audit logs
-* Transactional approval logic
-* Defensive numeric validation
-* No trust in frontend-only approval state
+These credentials are examples for local assessment/demo use, not production credentials. Do not expose real production credentials in this README. Change default passwords before deploying any demo account publicly.
 
-The sewing queue does not depend on the frontend to decide whether a batch is verified.
+## AI-Assisted Development
 
----
+AI assistance may be used to accelerate architecture planning, domain-rule design, test-case generation, API structure, validation design, documentation, and edge-case identification.
 
-## Testing Strategy
+Human review remains responsible for checking:
 
-The project uses two testing layers.
+* Business-rule correctness
+* Authorization and security boundaries
+* Database design and data integrity
+* Test execution and interpretation
+* Production deployment decisions
 
-### Unit tests
-
-Business logic is tested independently:
-
-```text
-verification-rules
-wastage-calculator
-state-machine
-```
-
-### Integration tests
-
-API behavior is tested through the Express application:
-
-```text
-approval
-rejection
-RBAC
-sewing queue
-```
-
-This verifies that critical authorization and production-gate rules work through the real API boundary.
-
----
-
-## AI Optimization
-
-AI-assisted development was used to accelerate:
-
-* Architecture planning
-* Domain rule design
-* Test case generation
-* API structure
-* Validation logic
-* Documentation
-* Edge-case identification
-
-Human review remains responsible for:
-
-* Business rule correctness
-* Security boundaries
-* Database design
-* Test verification
-* Production decisions
-
-See:
-
-```text
-docs/AI-OPTIMIZATION-REPORT.md
-```
-
-for the detailed report.
-
----
-
-## Development Principles
-
-The project follows:
-
-* Separation of concerns
-* Domain-driven business rules
-* Server-side authorization
-* Explicit state transitions
-* Transactional critical operations
-* Test-driven verification of critical paths
-* Defensive validation
-* Auditability
-* Clear module boundaries
-
----
+See `AI_OPTIMIZATION_REPORT.md` in the repository root for the assessment report. Keep the report aligned with the actual AI-assisted workflow and the work that was reviewed and tested.
 
 ## Project Status
 
+Keep this checklist synchronized with the implementation in the repository.
+
 ### Backend
 
-* [x] Database schema
-* [x] Authentication
-* [x] RBAC
-* [x] Recipe management
-* [x] Cutting orders
-* [x] Component verification
-* [x] Approval gate
-* [x] Rejection workflow
-* [x] Audit logging
-* [x] Wastage calculation
-* [x] Sewing queue
-* [x] Unit tests
-* [x] Integration tests
-* [x] TypeScript build
+* [ ] Database schema and persistence verified
+* [ ] Authentication and RBAC verified
+* [ ] Recipe management verified
+* [ ] Cutting-order workflow verified
+* [ ] Component verification rules verified
+* [ ] Approval and rejection gates verified
+* [ ] Audit logging verified
+* [ ] Wastage calculations verified
+* [ ] Sewing queue filtering verified
+* [ ] Automated tests passing
+* [ ] TypeScript validation and build passing
 
 ### Frontend
 
-* [ ] Login UI
-* [ ] Role-based dashboards
-* [ ] Cutting order UI
-* [ ] Verification UI
-* [ ] Sewing queue UI
-* [ ] Error/loading states
-* [ ] Responsive design
+* [ ] Login UI verified
+* [ ] Role-based views verified
+* [ ] Cutting-order UI verified
+* [ ] Verification UI verified
+* [ ] Sewing queue UI verified
+* [ ] Error and loading states verified
+* [ ] Responsive layout verified
 
 ### Documentation
 
-* [x] README
-* [x] API documentation
-* [x] AI optimization report
-* [x] Environment example
-
----
+* [ ] README matches the actual repository
+* [ ] API documentation checked
+* [ ] Root-level AI optimization report added
+* [ ] Environment example checked
+* [ ] Setup and demo instructions tested
 
 ## License
 
